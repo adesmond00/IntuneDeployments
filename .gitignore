@@ -2,3 +2,4 @@
 *.exe
 *.msi
 *.exe
+MSI Deployment/Apps/*/output/
