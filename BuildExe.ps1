@@ -49,7 +49,7 @@ $joinedInstallArgs   = $InstallArgs -join " "
 $joinedUninstallArgs = $UninstallArgs -join " "
 
 # Log folder
-$logFolder = "C:\sigmatech\installLogs"
+# $logFolder = "C:\sigmatech\installLogs"
 
 # Number of days to keep logs
 $logRetentionDays = 30
@@ -136,7 +136,6 @@ foreach ($appFolder in $appFolders) {
     $scriptVars = @"
 `$logFolder = "C:\sigmatech\installLogs"
 `$mainInstaller = "$($mainInstaller.FullName)"
-`$depFolder = "$depFolder"
 `$installArgs = "$joinedInstallArgs"
 `$uninstallArgs = "$joinedUninstallArgs"
 "@
@@ -160,18 +159,6 @@ if (!(Test-Path `$logFolder)) {
 Get-ChildItem -Path `$logFolder -Filter *.log -Recurse -ErrorAction SilentlyContinue |
     Where-Object { `$_.LastWriteTime -lt (Get-Date).AddDays(-$logRetentionDays) } |
     Remove-Item -Force -ErrorAction SilentlyContinue
-
-# Install dependencies
-if (Test-Path `$depFolder) {
-    `$dependencies = Get-ChildItem -Path `$depFolder -Filter *.exe -File -ErrorAction SilentlyContinue
-    if (`$dependencies) {
-        foreach (`$dep in `$dependencies) {
-            `$depLog = Join-Path `$logFolder ("Install_" + `$(`$dep.BaseName) + ".log")
-            Write-Host "Installing dependency: `$(`$dep.Name)"
-            Start-Process -FilePath "`$(`$dep.FullName)" -ArgumentList `$installArgs -Wait -NoNewWindow -RedirectStandardOutput "`$depLog" -RedirectStandardError "`$depLog"
-        }
-    }
-}
 
 # Install main application
 `$mainLog = Join-Path `$logFolder ("Install_" + `$([System.IO.Path]::GetFileNameWithoutExtension(`$mainInstaller)) + ".log")
@@ -205,18 +192,6 @@ Get-ChildItem -Path `$logFolder -Filter *.log -Recurse -ErrorAction SilentlyCont
 `$mainLog = Join-Path `$logFolder ("Uninstall_" + `$([System.IO.Path]::GetFileNameWithoutExtension(`$mainInstaller)) + ".log")
 Write-Host "Uninstalling main application EXE: `$([System.IO.Path]::GetFileName(`$mainInstaller))"
 Start-Process -FilePath `$mainInstaller -ArgumentList `$uninstallArgs -Wait -NoNewWindow -RedirectStandardOutput "`$mainLog" -RedirectStandardError "`$mainLog"
-
-# Uninstall dependencies
-if (Test-Path `$depFolder) {
-    `$dependencies = Get-ChildItem -Path `$depFolder -Filter *.exe -File -ErrorAction SilentlyContinue
-    if (`$dependencies) {
-        foreach (`$dep in `$dependencies) {
-            `$depLog = Join-Path `$logFolder ("Uninstall_" + `$(`$dep.BaseName) + ".log")
-            Write-Host "Uninstalling dependency: `$(`$dep.Name)"
-            Start-Process -FilePath "`$(`$dep.FullName)" -ArgumentList `$uninstallArgs -Wait -NoNewWindow -RedirectStandardOutput "`$depLog" -RedirectStandardError "`$depLog"
-        }
-    }
-}
 
 Write-Host "Uninstallation of '$appName' complete."
 "@
