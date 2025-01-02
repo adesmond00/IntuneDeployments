@@ -1,6 +1,6 @@
 # Intune Deployment Automation
 
-This repository contains PowerShell scripts for automating application deployments through Microsoft Intune, supporting both MSI and EXE package types.
+This repository contains standalone PowerShell scripts for automating application deployments through Microsoft Intune, supporting MSI, EXE, and Winget package types.
 
 ## Directory Structure
 
@@ -9,7 +9,6 @@ Intune Deployments/
 ├── BuildExe.ps1          # EXE deployment script
 ├── BuildMsi.ps1          # MSI deployment script
 ├── BuildWinget.ps1       # Winget deployment script
-├── main.ps1              # Main deployment controller
 ├── EXE Deployment/       # EXE application deployments
 │   └── Apps/             # Individual EXE applications
 ├── MSI Deployment/       # MSI application deployments
@@ -28,7 +27,7 @@ Intune Deployments/
 1. Place your MSI file in `MSI Deployment/Apps/[AppName]/`
 2. Run the deployment script:
    ```powershell
-   .\main.ps1 -deploymentType MSI -appName [AppName]
+   .\BuildMsi.ps1 -appName [AppName]
    ```
 3. The script will:
    - Move the MSI file to the source directory
@@ -41,19 +40,20 @@ Intune Deployments/
 2. Add any dependencies in `EXE Deployment/Apps/[AppName]/source/Dependencies/`
 3. Run the deployment script:
    ```powershell
-   .\main.ps1 -deploymentType EXE
+   .\BuildExe.ps1
    ```
 4. The script will:
    - Generate install.ps1 and uninstall.ps1 scripts
    - Handle dependency installation/uninstallation
    - Create log files in `C:\sigmatech\installLogs`
 
-### General Deployment
+### Winget Deployments
 
-To process both MSI and EXE deployments:
-```powershell
-.\main.ps1
-```
+1. Place your Winget package files in the appropriate directory
+2. Run the deployment script:
+   ```powershell
+   .\BuildWinget.ps1
+   ```
 
 ## Configuration
 
@@ -69,19 +69,14 @@ To process both MSI and EXE deployments:
 
 ## Examples
 
-Process all deployments:
-```powershell
-.\main.ps1
-```
-
 Deploy specific MSI application:
 ```powershell
-.\main.ps1 -deploymentType MSI -appName "GoogleChrome"
+.\BuildMsi.ps1 -appName "GoogleChrome"
 ```
 
 Deploy EXE with custom arguments:
 ```powershell
-.\main.ps1 -deploymentType EXE -InstallArgs "/quiet" -UninstallArgs "/uninstall /quiet"
+.\BuildExe.ps1 -InstallArgs "/quiet" -UninstallArgs "/uninstall /quiet"
 ```
 
 ## Notes
