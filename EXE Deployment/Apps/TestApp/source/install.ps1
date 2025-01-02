@@ -1,11 +1,11 @@
 ﻿# This script installs the 'TestApp' application along with its dependencies.
-# Generated on: 01/02/2025 16:09:54
+# Generated on: 01/02/2025 17:07:02
 
 param()
 
 # Initialize variables
 $logFolder = "C:\sigmatech\installLogs"
-$mainInstaller = "C:\Users\Avi\Documents\Projects\Intune Deployments Files\Current working folder\Intune Deployments\EXE Deployment\Apps\TestApp\source\test.exe"
+$mainInstaller = "C:\Users\Avi\Documents\Projects\Intune Deployments Files\Current working folder\Intune Deployments\EXE Deployment\Apps\TestApp\source\hello.exe"
 $installArgs = "/S"
 $uninstallArgs = "/S /uninstall"
 

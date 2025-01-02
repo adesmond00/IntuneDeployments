@@ -1,24 +1,31 @@
 <#
 .SYNOPSIS
-    Installs a WinGet package under System context with optional pre- and post-install scripts.
-    
+    Installs or Uninstalls a WinGet package under System context with optional pre- and post-install scripts.
+
 .DESCRIPTION
     This script demonstrates:
       - Locating winget.exe in the system,
       - Logging to a specific folder,
-      - Handling optional pre- and post-install scripts,
-      - Performing log cleanup of files older than 60 days.
+      - Handling optional pre- and post-install scripts (for the Install scenario),
+      - Performing log cleanup of files older than 60 days,
+      - Allowing either an Install or Uninstall operation via parameters.
 
 .PARAMETER WinGetID
     The WinGet package identifier (e.g. "Microsoft.VisualStudioCode").
 
+.PARAMETER Install
+    Switch parameter to perform an INSTALL of the specified WinGet package.
+
+.PARAMETER Uninstall
+    Switch parameter to perform an UNINSTALL of the specified WinGet package.
+
 .PARAMETER PreInstallScript
     Path to a pre-install script that should be run before the WinGet installation.
-    This parameter is optional.
+    This parameter is optional and only used during Install.
 
 .PARAMETER PostInstallScript
     Path to a post-install script that should be run after the WinGet installation.
-    This parameter is optional.
+    This parameter is optional and only used during Install.
 #>
 
 [CmdletBinding()]
@@ -26,6 +33,14 @@ param (
     [Parameter(Mandatory = $true)]
     [string]
     $WinGetID,
+
+    [Parameter(Mandatory = $false)]
+    [switch]
+    $Install,
+
+    [Parameter(Mandatory = $false)]
+    [switch]
+    $Uninstall,
 
     [Parameter(Mandatory = $false)]
     [string]
@@ -39,13 +54,21 @@ param (
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# --- 1. Define Logging Directory and Clean Up Old Logs ---
+# --- 1. Check Action (Install or Uninstall) ---
+if (-not $Install -and -not $Uninstall) {
+    throw "You must specify either -Install or -Uninstall."
+}
+
+if ($Install -and $Uninstall) {
+    throw "You cannot specify both -Install and -Uninstall at the same time."
+}
+
+# --- 2. Define Logging Directory and Clean Up Old Logs ---
 $LogDirectory = Join-Path -Path $env:ProgramData -ChildPath "WinGet-SigmatechLogs"
 if (-not (Test-Path -Path $LogDirectory -PathType Container)) {
     New-Item -ItemType Directory -Path $LogDirectory | Out-Null
 }
 
-# Clean up logs older than 60 days.
 Write-Host "Cleaning up logs older than 60 days in: $LogDirectory"
 Get-ChildItem -Path $LogDirectory -File -Recurse -Force -ErrorAction SilentlyContinue |
     Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-60) } |
@@ -53,18 +76,19 @@ Get-ChildItem -Path $LogDirectory -File -Recurse -Force -ErrorAction SilentlyCon
 
 # Create a timestamped log file
 $TimeStamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$LogFile   = Join-Path -Path $LogDirectory -ChildPath "WinGetInstall-$($TimeStamp).log"
+$LogFile   = Join-Path -Path $LogDirectory -ChildPath "WinGet-$($TimeStamp).log"
 
 # Simple helper function to write messages to console & log
 function Write-Log {
     param (
-        [Parameter(Mandatory=$true)][string]$Message
+        [Parameter(Mandatory=$true)]
+        [string]$Message
     )
     Write-Host $Message
     Add-Content -Path $LogFile -Value $Message
 }
 
-# --- 2. Function to Locate winget.exe ---
+# --- 3. Function to Locate winget.exe ---
 function Get-WinGetPath {
     Write-Log "Locating winget.exe..."
 
@@ -83,12 +107,12 @@ function Get-WinGetPath {
         Write-Log "Get-AppxPackage for Microsoft.DesktopAppInstaller failed or not available."
     }
 
-    # Attempt 2: Look within the standard WindowsApps directory (common on many systems)
+    # Attempt 2: Look within the standard WindowsApps directory
     $windowsAppsPath = Join-Path $env:ProgramFiles "WindowsApps"
     if (Test-Path $windowsAppsPath) {
         $wingetPaths = Get-ChildItem -Path $windowsAppsPath -Recurse -Filter "winget.exe" -ErrorAction SilentlyContinue
         if ($wingetPaths) {
-            # If multiple are found, pick the most recently modified or just the first
+            # If multiple are found, pick the most recently modified
             $chosen = $wingetPaths | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             Write-Log "Found winget.exe via file search: $($chosen.FullName)"
             return $chosen.FullName
@@ -113,49 +137,66 @@ function Get-WinGetPath {
 
 $wingetPath = Get-WinGetPath
 
-# --- 3. Run Pre-Install Script (if provided) ---
-if ($PreInstallScript) {
-    if (Test-Path $PreInstallScript) {
-        Write-Log "Running pre-install script: $PreInstallScript"
-        try {
-            & $PreInstallScript 2>&1 | Tee-Object -FilePath $LogFile -Append
-        }
-        catch {
-            Write-Log "Pre-install script failed: $($_.Exception.Message)"
-            throw
-        }
-    }
-    else {
-        Write-Log "Pre-install script not found at path: $PreInstallScript"
-    }
-}
+# --- 4. Install or Uninstall Logic ---
 
-# --- 4. Run WinGet Install ---
-Write-Log "Installing WinGet package: $WinGetID"
-try {
-    & $wingetPath install --id $WinGetID --silent --accept-package-agreements --accept-source-agreements 2>&1 |
-        Tee-Object -FilePath $LogFile -Append
-}
-catch {
-    Write-Log "WinGet install failed for '$WinGetID': $($_.Exception.Message)"
-    throw
-}
-
-# --- 5. Run Post-Install Script (if provided) ---
-if ($PostInstallScript) {
-    if (Test-Path $PostInstallScript) {
-        Write-Log "Running post-install script: $PostInstallScript"
-        try {
-            & $PostInstallScript 2>&1 | Tee-Object -FilePath $LogFile -Append
+if ($Install) {
+    # --- 4a. Run Pre-Install Script (if provided) ---
+    if ($PreInstallScript) {
+        if (Test-Path $PreInstallScript) {
+            Write-Log "Running pre-install script: $PreInstallScript"
+            try {
+                & $PreInstallScript 2>&1 | Tee-Object -FilePath $LogFile -Append
+            }
+            catch {
+                Write-Log "Pre-install script failed: $($_.Exception.Message)"
+                throw
+            }
         }
-        catch {
-            Write-Log "Post-install script failed: $($_.Exception.Message)"
-            throw
+        else {
+            Write-Log "Pre-install script not found at path: $PreInstallScript"
         }
     }
-    else {
-        Write-Log "Post-install script not found at path: $PostInstallScript"
-    }
-}
 
-Write-Log "Installation for '$WinGetID' completed successfully."
+    # --- 4b. Run WinGet Install ---
+    Write-Log "Installing WinGet package: $WinGetID"
+    try {
+        & $wingetPath install --id $WinGetID --silent --accept-package-agreements --accept-source-agreements 2>&1 |
+            Tee-Object -FilePath $LogFile -Append
+    }
+    catch {
+        Write-Log "WinGet install failed for '$WinGetID': $($_.Exception.Message)"
+        throw
+    }
+
+    # --- 4c. Run Post-Install Script (if provided) ---
+    if ($PostInstallScript) {
+        if (Test-Path $PostInstallScript) {
+            Write-Log "Running post-install script: $PostInstallScript"
+            try {
+                & $PostInstallScript 2>&1 | Tee-Object -FilePath $LogFile -Append
+            }
+            catch {
+                Write-Log "Post-install script failed: $($_.Exception.Message)"
+                throw
+            }
+        }
+        else {
+            Write-Log "Post-install script not found at path: $PostInstallScript"
+        }
+    }
+
+    Write-Log "Installation for '$WinGetID' completed successfully."
+}
+elseif ($Uninstall) {
+    # --- 4d. Run WinGet Uninstall ---
+    Write-Log "Uninstalling WinGet package: $WinGetID"
+    try {
+        & $wingetPath uninstall --id $WinGetID 2>&1 | Tee-Object -FilePath $LogFile -Append
+    }
+    catch {
+        Write-Log "WinGet uninstall failed for '$WinGetID': $($_.Exception.Message)"
+        throw
+    }
+
+    Write-Log "Uninstallation for '$WinGetID' completed successfully."
+}
