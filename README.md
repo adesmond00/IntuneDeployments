@@ -12,6 +12,18 @@ contentPrep.ps1
 README.md
 MSI Deployment/
 ├── Apps/
+│   ├── chrome/
+│   │   ├── output/
+│   │   └── source/
+│   │       ├── install.ps1
+│   │       ├── uninstall.ps1
+│   │       └── usage.txt
+│   └── YealinkUsbConnect/
+│       ├── output/
+│       └── source/
+│           ├── install.ps1
+│           ├── uninstall.ps1
+│           └── usage.txt
 tools/
 ├── Detect-App/
 │   └── Detect-App.ps1
