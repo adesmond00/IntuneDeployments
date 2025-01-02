@@ -18,17 +18,28 @@ foreach ($currentApp in $appNames) {
     $outputPath = Join-Path $appPath "output"
 
     # Create source and output directories if they don't exist
-    if (-not (Test-Path $sourcePath)) {
-        New-Item -ItemType Directory -Path $sourcePath | Out-Null
-    } else {
-        # Remove only deployment files if they exist
-        Remove-Item -Path (Join-Path $sourcePath "install.ps1") -ErrorAction SilentlyContinue
-        Remove-Item -Path (Join-Path $sourcePath "uninstall.ps1") -ErrorAction SilentlyContinue
-        Remove-Item -Path (Join-Path $sourcePath "usage.txt") -ErrorAction SilentlyContinue
+    try {
+        if (-not (Test-Path $sourcePath)) {
+            Write-Host "Creating source directory: $sourcePath"
+            New-Item -ItemType Directory -Path $sourcePath | Out-Null
+        } else {
+            Write-Host "Source directory exists: $sourcePath"
+            # Remove only deployment files if they exist
+            Remove-Item -Path (Join-Path $sourcePath "install.ps1") -ErrorAction SilentlyContinue
+            Remove-Item -Path (Join-Path $sourcePath "uninstall.ps1") -ErrorAction SilentlyContinue
+            Remove-Item -Path (Join-Path $sourcePath "usage.txt") -ErrorAction SilentlyContinue
+        }
+        
+        if (-not (Test-Path $outputPath)) {
+            Write-Host "Creating output directory: $outputPath"
+            New-Item -ItemType Directory -Path $outputPath | Out-Null
+        } else {
+            Write-Host "Output directory exists: $outputPath"
+        }
     }
-    
-    if (-not (Test-Path $outputPath)) {
-        New-Item -ItemType Directory -Path $outputPath | Out-Null
+    catch {
+        Write-Error "Failed to create required directories: $_"
+        continue
     }
 
     # Move .msi file to source directory

@@ -43,8 +43,12 @@ if ($processEXE) {
 $jobs = @()
 
 if ($processMSI) {
+    Write-Host "Starting MSI job with script root: $PSScriptRoot"
     $msiJob = Start-Job -ScriptBlock {
         param($scriptRoot, $appName)
+        Write-Host "MSI job script root: $scriptRoot"
+        Set-Location $scriptRoot
+        Write-Host "Current directory: $(Get-Location)"
         & "$scriptRoot\BuildMsi.ps1" -appName $appName
     } -ArgumentList $PSScriptRoot, $appName
     $jobs += $msiJob

@@ -1,0 +1,2 @@
+Installation Usage: powershell.exe -executionpolicy bypass -windowstyle hidden -file .\install.ps1
+Uninstall Usage: powershell.exe -executionpolicy bypass -windowstyle hidden -file .\uninstall.ps1
