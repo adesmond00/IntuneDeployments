@@ -188,10 +188,11 @@ if ($Install) {
     Write-Log "Installation for '$WinGetID' completed successfully."
 }
 elseif ($Uninstall) {
-    # --- 4d. Run WinGet Uninstall ---
+    # --- 4d. Run WinGet Uninstall (now with accept-all flags) ---
     Write-Log "Uninstalling WinGet package: $WinGetID"
     try {
-        & $wingetPath uninstall --id $WinGetID 2>&1 | Tee-Object -FilePath $LogFile -Append
+        & $wingetPath uninstall --id $WinGetID --accept-package-agreements --accept-source-agreements 2>&1 |
+            Tee-Object -FilePath $LogFile -Append
     }
     catch {
         Write-Log "WinGet uninstall failed for '$WinGetID': $($_.Exception.Message)"
