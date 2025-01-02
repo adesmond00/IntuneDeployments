@@ -9,14 +9,14 @@
      - A "source" folder containing the main installer .exe.
      - A "Dependencies" folder containing zero or more .exe dependencies.
   3. Generates an install.ps1 script that:
-     - Creates C:\sigmatech\installLogs if it doesn’t exist.
-     - Installs each dependency silently, one by one, logging to file.
+     - Creates C:\sigmatech\installLogs if it doesn't exist.
+     - Installs each dependency silently, one by one, logging to file (if dependencies exist).
      - Installs the main EXE silently, logging to file.
      - Cleans up any logs older than 30 days in C:\sigmatech\installLogs.
   4. Generates an uninstall.ps1 script that:
-     - Creates C:\sigmatech\installLogs if it doesn’t exist.
+     - Creates C:\sigmatech\installLogs if it doesn't exist.
      - Uninstalls the main EXE silently, logging to file.
-     - Uninstalls each dependency silently, logging to file.
+     - Uninstalls each dependency silently, logging to file (if dependencies exist).
      - Cleans up any logs older than 30 days in C:\sigmatech\installLogs.
   5. Places both scripts in the "source" folder for each application.
 
@@ -41,8 +41,8 @@ param(
 
 # -- Configuration --
 
-# Change this path to the root folder where your EXE deployment folders live.
-$EXEDeploymentRoot = "C:\Path\To\EXE Deployment"
+# Get the EXE deployment root relative to the script location
+$EXEDeploymentRoot = Join-Path $PSScriptRoot "EXE Deployment"
 
 # Convert array of args into a single string (e.g., "/S /silent")
 $joinedInstallArgs   = $InstallArgs -join " "
@@ -61,18 +61,65 @@ Write-Host "Using install arguments:   $joinedInstallArgs"
 Write-Host "Using uninstall arguments: $joinedUninstallArgs"
 Write-Host ""
 
-# Get all subfolders in the EXE Deployment directory (each is an 'app')
-$appFolders = Get-ChildItem -Path $EXEDeploymentRoot -Directory -ErrorAction SilentlyContinue
+# Get all subfolders in the EXE Deployment/Apps directory (each is an 'app')
+$appsFolder = Join-Path $EXEDeploymentRoot "Apps"
+$appFolders = Get-ChildItem -Path $appsFolder -Directory -ErrorAction SilentlyContinue
 
 foreach ($appFolder in $appFolders) {
-    $appName      = $appFolder.Name
+    $appName = $appFolder.Name
+    Write-Host "Processing application: $appName"
+    
+    # Create source and output folders if they don't exist
     $sourceFolder = Join-Path $appFolder.FullName "source"
-    $depFolder    = Join-Path $sourceFolder "Dependencies"
-
-    # Skip if there's no "source" folder
+    $outputFolder = Join-Path $appFolder.FullName "output"
+    
     if (-not (Test-Path $sourceFolder)) {
-        Write-Warning "Skipping '$($appFolder.FullName)' because no 'source' folder was found."
+        New-Item -ItemType Directory -Path $sourceFolder | Out-Null
+        Write-Host "Created source folder at: $sourceFolder"
+    }
+    
+    if (-not (Test-Path $outputFolder)) {
+        New-Item -ItemType Directory -Path $outputFolder | Out-Null
+        Write-Host "Created output folder at: $outputFolder"
+    }
+
+    # Create Dependencies folder if it doesn't exist
+    $depFolder = Join-Path $sourceFolder "Dependencies"
+    if (-not (Test-Path $depFolder)) {
+        New-Item -ItemType Directory -Path $depFolder | Out-Null
+        Write-Host "Created Dependencies folder at: $depFolder"
+    }
+
+    # Move any .exe files from app folder root to source folder
+    $exeFiles = Get-ChildItem -Path $appFolder.FullName -Filter *.exe -File -Depth 0 -ErrorAction SilentlyContinue
+    foreach ($exe in $exeFiles) {
+        # Only move if not already in source folder
+        if ($exe.DirectoryName -ne $sourceFolder) {
+            $destination = Join-Path $sourceFolder $exe.Name
+            Move-Item -Path $exe.FullName -Destination $destination -Force
+            Write-Host "Moved $($exe.Name) to $destination"
+        }
+    }
+
+    # Verify folder structure
+    if (-not (Test-Path $sourceFolder)) {
+        Write-Error "Failed to create source folder at: $sourceFolder"
         continue
+    }
+    if (-not (Test-Path $depFolder)) {
+        Write-Error "Failed to create Dependencies folder at: $depFolder"
+        continue
+    }
+
+    # Move any .exe files from app folder to source folder
+    $exeFiles = Get-ChildItem -Path $appFolder.FullName -Filter *.exe -File -Recurse -ErrorAction SilentlyContinue
+    foreach ($exe in $exeFiles) {
+        # Only move if not already in source folder
+        if ($exe.DirectoryName -ne $sourceFolder) {
+            $destination = Join-Path $sourceFolder $exe.Name
+            Move-Item -Path $exe.FullName -Destination $destination -Force
+            Write-Host "Moved $($exe.Name) to $destination"
+        }
     }
 
     # Identify the primary installer .exe (assume there is exactly one)
@@ -85,11 +132,14 @@ foreach ($appFolder in $appFolders) {
         continue
     }
 
-    # Gather any dependency .exe files
-    $dependencies = @()
-    if (Test-Path $depFolder) {
-        $dependencies = Get-ChildItem -Path $depFolder -Filter *.exe -File -ErrorAction SilentlyContinue
-    }
+    # Define variables for the generated scripts
+    $scriptVars = @"
+`$logFolder = "C:\sigmatech\installLogs"
+`$mainInstaller = "$($mainInstaller.FullName)"
+`$depFolder = "$depFolder"
+`$installArgs = "$joinedInstallArgs"
+`$uninstallArgs = "$joinedUninstallArgs"
+"@
 
     # Build the install.ps1 script content
     $installScript = @"
@@ -98,35 +148,36 @@ foreach ($appFolder in $appFolders) {
 
 param()
 
+# Initialize variables
+$scriptVars
+
 # Create log folder if it doesn't exist
-if (!(Test-Path "$logFolder")) {
-    New-Item -ItemType Directory -Path "$logFolder" | Out-Null
+if (!(Test-Path `$logFolder)) {
+    New-Item -ItemType Directory -Path `$logFolder | Out-Null
 }
 
 # Remove logs older than $logRetentionDays days
-Get-ChildItem -Path "$logFolder" -Filter *.log -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { \$_.LastWriteTime -lt (Get-Date).AddDays(-$logRetentionDays) } |
+Get-ChildItem -Path `$logFolder -Filter *.log -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { `$_.LastWriteTime -lt (Get-Date).AddDays(-$logRetentionDays) } |
     Remove-Item -Force -ErrorAction SilentlyContinue
 
 # Install dependencies
-"@
-
-    foreach ($dep in $dependencies) {
-        $depLog = Join-Path $logFolder ("Install_" + $($dep.BaseName) + ".log")
-        $installScript += @"
-Write-Host "Installing dependency: $($dep.Name)"
-Start-Process -FilePath "$($dep.FullName)" -ArgumentList "$joinedInstallArgs" -Wait -NoNewWindow -RedirectStandardOutput "$depLog" -RedirectStandardError "$depLog"
-"@
+if (Test-Path `$depFolder) {
+    `$dependencies = Get-ChildItem -Path `$depFolder -Filter *.exe -File -ErrorAction SilentlyContinue
+    if (`$dependencies) {
+        foreach (`$dep in `$dependencies) {
+            `$depLog = Join-Path `$logFolder ("Install_" + `$(`$dep.BaseName) + ".log")
+            Write-Host "Installing dependency: `$(`$dep.Name)"
+            Start-Process -FilePath "`$(`$dep.FullName)" -ArgumentList `$installArgs -Wait -NoNewWindow -RedirectStandardOutput "`$depLog" -RedirectStandardError "`$depLog"
+        }
     }
+}
 
-    # Now install the main EXE
-    $mainLog = Join-Path $logFolder ("Install_" + $($mainInstaller.BaseName) + ".log")
-    $installScript += @"
-Write-Host "Installing main application EXE: $($mainInstaller.Name)"
-Start-Process -FilePath "$($mainInstaller.FullName)" -ArgumentList "$joinedInstallArgs" -Wait -NoNewWindow -RedirectStandardOutput "$mainLog" -RedirectStandardError "$mainLog"
-"@
+# Install main application
+`$mainLog = Join-Path `$logFolder ("Install_" + `$([System.IO.Path]::GetFileNameWithoutExtension(`$mainInstaller)) + ".log")
+Write-Host "Installing main application EXE: `$([System.IO.Path]::GetFileName(`$mainInstaller))"
+Start-Process -FilePath `$mainInstaller -ArgumentList `$installArgs -Wait -NoNewWindow -RedirectStandardOutput "`$mainLog" -RedirectStandardError "`$mainLog"
 
-    $installScript += @"
 Write-Host "Installation of '$appName' complete."
 "@
 
@@ -137,35 +188,36 @@ Write-Host "Installation of '$appName' complete."
 
 param()
 
+# Initialize variables
+$scriptVars
+
 # Create log folder if it doesn't exist
-if (!(Test-Path "$logFolder")) {
-    New-Item -ItemType Directory -Path "$logFolder" | Out-Null
+if (!(Test-Path `$logFolder)) {
+    New-Item -ItemType Directory -Path `$logFolder | Out-Null
 }
 
 # Remove logs older than $logRetentionDays days
-Get-ChildItem -Path "$logFolder" -Filter *.log -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { \$_.LastWriteTime -lt (Get-Date).AddDays(-$logRetentionDays) } |
+Get-ChildItem -Path `$logFolder -Filter *.log -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { `$_.LastWriteTime -lt (Get-Date).AddDays(-$logRetentionDays) } |
     Remove-Item -Force -ErrorAction SilentlyContinue
 
-# Uninstall main application EXE
-"@
+# Uninstall main application
+`$mainLog = Join-Path `$logFolder ("Uninstall_" + `$([System.IO.Path]::GetFileNameWithoutExtension(`$mainInstaller)) + ".log")
+Write-Host "Uninstalling main application EXE: `$([System.IO.Path]::GetFileName(`$mainInstaller))"
+Start-Process -FilePath `$mainInstaller -ArgumentList `$uninstallArgs -Wait -NoNewWindow -RedirectStandardOutput "`$mainLog" -RedirectStandardError "`$mainLog"
 
-    $uninstallMainLog = Join-Path $logFolder ("Uninstall_" + $($mainInstaller.BaseName) + ".log")
-    $uninstallScript += @"
-Write-Host "Uninstalling main application EXE: $($mainInstaller.Name)"
-Start-Process -FilePath "$($mainInstaller.FullName)" -ArgumentList "$joinedUninstallArgs" -Wait -NoNewWindow -RedirectStandardOutput "$uninstallMainLog" -RedirectStandardError "$uninstallMainLog"
-"@
-
-    # Then uninstall dependencies (if applicable)
-    foreach ($dep in $dependencies) {
-        $unDepLog = Join-Path $logFolder ("Uninstall_" + $($dep.BaseName) + ".log")
-        $uninstallScript += @"
-Write-Host "Uninstalling dependency: $($dep.Name)"
-Start-Process -FilePath "$($dep.FullName)" -ArgumentList "$joinedUninstallArgs" -Wait -NoNewWindow -RedirectStandardOutput "$unDepLog" -RedirectStandardError "$unDepLog"
-"@
+# Uninstall dependencies
+if (Test-Path `$depFolder) {
+    `$dependencies = Get-ChildItem -Path `$depFolder -Filter *.exe -File -ErrorAction SilentlyContinue
+    if (`$dependencies) {
+        foreach (`$dep in `$dependencies) {
+            `$depLog = Join-Path `$logFolder ("Uninstall_" + `$(`$dep.BaseName) + ".log")
+            Write-Host "Uninstalling dependency: `$(`$dep.Name)"
+            Start-Process -FilePath "`$(`$dep.FullName)" -ArgumentList `$uninstallArgs -Wait -NoNewWindow -RedirectStandardOutput "`$depLog" -RedirectStandardError "`$depLog"
+        }
     }
+}
 
-    $uninstallScript += @"
 Write-Host "Uninstallation of '$appName' complete."
 "@
 
