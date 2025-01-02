@@ -55,6 +55,21 @@ Intune Deployments/
    .\BuildWinget.ps1
    ```
 
+## Examples
+
+# Example 1: Install Visual Studio Code (no scripts)
+.\Install-Uninstall-WinGet.ps1 -WinGetID "Microsoft.VisualStudioCode" -Install
+
+# Example 2: Install Git with a PreInstall and PostInstall script
+.\Install-Uninstall-WinGet.ps1 `
+    -WinGetID "Git.Git" `
+    -Install `
+    -PreInstallScript  "C:\Scripts\PreInstall.ps1" `
+    -PostInstallScript "C:\Scripts\PostInstall.ps1"
+
+# Example 3: Uninstall Visual Studio Code
+.\Install-Uninstall-WinGet.ps1 -WinGetID "Microsoft.VisualStudioCode" -Uninstall
+
 ## Configuration
 
 ### MSI Deployment Options
