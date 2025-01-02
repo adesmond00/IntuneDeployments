@@ -1,5 +1,6 @@
 *.msi
 *.exe
-*.msi
-*.exe
 MSI Deployment/Apps/*/output/
+MSI Deployment/Apps/*/source/install.ps1
+MSI Deployment/Apps/*/source/uninstall.ps1
+MSI Deployment/Apps/*/source/usage.txt

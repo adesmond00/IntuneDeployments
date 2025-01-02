@@ -5,19 +5,34 @@ This repository contains standalone PowerShell scripts for automating applicatio
 ## Directory Structure
 
 ```
-Intune Deployments/
-├── BuildExe.ps1          # EXE deployment script
-├── BuildMsi.ps1          # MSI deployment script
-├── BuildWinget.ps1       # Winget deployment script
-├── EXE Deployment/       # EXE application deployments
-│   └── Apps/             # Individual EXE applications
-├── MSI Deployment/       # MSI application deployments
-│   └── Apps/             # Individual MSI applications
-└── tools/                # Supporting tools
-    ├── Detect-App/       # Application detection scripts
-    ├── Get-MsiProductCode/ # MSI product code retrieval
-    ├── Install-MSI/      # MSI installation scripts
-    └── Uninstall-MSI/    # MSI uninstallation scripts
+.gitignore
+BuildMsi.ps1
+BuildWinget.ps1
+contentPrep.ps1
+README.md
+MSI Deployment/
+├── Apps/
+│   ├── chrome/
+│   │   ├── output/
+│   │   └── source/
+│   │       ├── install.ps1
+│   │       ├── uninstall.ps1
+│   │       └── usage.txt
+│   └── YealinkUsbConnect/
+│       ├── output/
+│       └── source/
+│           ├── install.ps1
+│           ├── uninstall.ps1
+│           └── usage.txt
+tools/
+├── Detect-App/
+│   └── Detect-App.ps1
+├── Get-MsiProductCode/
+│   └── Get-MsiProductCode.ps1
+├── Install-MSI/
+│   └── Install-MSI.ps1
+└── Uninstall-MSI/
+    └── Uninstall-MSI.ps1
 ```
 
 ## Usage
