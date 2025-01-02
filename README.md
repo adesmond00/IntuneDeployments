@@ -59,6 +59,7 @@ To process both MSI and EXE deployments:
 
 ### MSI Deployment Options
 - `-appName`: Specify a specific application to process (optional)
+- `-InstallParams`: Custom installation parameters (default: "/quiet /norestart")
 - Default install/uninstall arguments: `/S`
 
 ### EXE Deployment Options

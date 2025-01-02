@@ -1,7 +1,8 @@
 # BuildMsi.ps1 - Handles MSI deployment logic
 
 param (
-    [string]$appName
+    [string]$appName,
+    [string]$InstallParams = "/quiet /norestart"
 )
 
 # If no specific app is provided, process all apps
@@ -92,6 +93,7 @@ foreach ($currentApp in $appNames) {
     if (Test-Path $installScriptPath) {
         $installScript = Get-Content $installScriptPath -Raw
         $installScript = $installScript -replace 'path_to_file\.msi', ".\$($msiFile.Name)"
+        $installScript = $installScript -replace '/quiet /norestart', $InstallParams
         Set-Content -Path (Join-Path $sourcePath "install.ps1") -Value $installScript
     } else {
         Write-Error "Install-MSI tool not found at path: $installScriptPath"
